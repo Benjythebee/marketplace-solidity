@@ -13,6 +13,8 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@opengsn/contracts/src/BaseRelayRecipient.sol";
 import "./lib/keyset.sol";
+import "./IWrappersRegistry.sol";
+import "./Wrappers/ICollectionWrapper.sol";
 
 /* We may need to modify the ERCRegistery
   - whenToken :  if the token is no registered, it will return true;
@@ -53,36 +55,36 @@ struct Listing {
 
 contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, IERC1155ReceiverUpgradeable, BaseRelayRecipient {
     event NewListing(    
-        address seller,
-        address contractAddress,
+        address indexed seller,
+        address indexed contractAddress,
         uint tokenId,
         uint price,
         uint quantity,
-        bytes32 listingId,
+        bytes32 indexed listingId,
         address acceptedPayment
     );
 
     event SaleWithToken(    
-        address seller,
-        address buyer,
+        address indexed seller,
+        address indexed buyer,
         address contractAddress,
         uint tokenId,
         uint price,
-        bytes32 listingId
+        bytes32 indexed listingId
     );
     event Sale(    
-        address seller,
-        address buyer,
+        address indexed seller,
+        address indexed buyer,
         uint tokenId,
         uint price,
-        bytes32 listingId
+        bytes32 indexed listingId
     );
 
     event CancelSale(    
-        address seller,
+        address indexed seller,
         uint tokenId,
         uint price,
-        bytes32 listingId
+        bytes32 indexed listingId
     );
     uint counter;
     using ERC165CheckerUpgradeable for address;
@@ -91,26 +93,37 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     mapping (bytes32 => Listing) listings;    
     KeySetLib.Set set;
 
+    IWrappersRegistry public wrapperRegistry;
     IERC20Registry internal registryAddress;
     uint public minPrice;
     uint public maxPrice;
 
+
     bytes4 public constant IID_IERC1155 = type(IERC1155Upgradeable).interfaceId;
     bytes4 public constant IID_IERC721 = type(IERC721Upgradeable).interfaceId;
 
-    function initialize (address _registryAddress, address _forwarder) public initializer {
+    /**
+     *@dev Initialize contract;
+     *@param _registryAddress is the address of the ERC20 token registry.
+     *@param _wrapperRegistry is the address of the registry for Wrappers
+     *@param _forwarder is the address of the trusted forwarder.
+     */
+    function initialize (address _registryAddress,address _wrapperRegistry, address _forwarder) public initializer {
         __UUPSUpgradeable_init();
         __Ownable_init();
         __Pausable_init();
 
         registryAddress = IERC20Registry(_registryAddress);
-        minPrice = 1 ether;
+        ///@dev Some wearables are incredibly cheap.
+        minPrice = 0.001 ether;
         maxPrice = type(uint).max;
         _setTrustedForwarder(_forwarder);
+
+        wrapperRegistry = IWrappersRegistry(_wrapperRegistry);
     }
 
     modifier onlyNFT(address _address) {
-        require(isERC1155(_address) || isERC721(_address));
+        require(isERC1155(_address) || isERC721(_address) || isRegisteredContract(_address));
         _;
     }
 
@@ -122,6 +135,10 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
     function isERC1155(address _address) public view returns (bool) {
         return _address.supportsInterface(IID_IERC1155);
+    }
+
+    function isRegisteredContract(address _address) public view returns (bool) {
+        return wrapperRegistry.isWrapped(_address);
     }
 
     function getListingCount () public view returns (uint) {
@@ -160,9 +177,12 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function _transferNFT(address _nftAddress, address _from, address _to, uint256 _tokenId, uint256 _quantity) private {
        if (isERC1155(_nftAddress)) {
             IERC1155(_nftAddress).safeTransferFrom(_from, _to, _tokenId, _quantity, "0x0");
-        } else {
+        } else if (isERC721(_nftAddress))  {
             IERC721(_nftAddress).transferFrom(_from, _to, _tokenId);
-        } 
+        } else{
+            (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(_nftAddress);
+            ICollectionWrapper(_wrapper).transferFrom(_from, _to, _tokenId,_quantity);
+        }
     }
 
     function list(address nftAddress, uint tokenId, uint price, uint quantity, address acceptedPayment) public onlyNFT(nftAddress) whenNotPaused returns (bytes32) {
@@ -171,18 +191,24 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(quantity > 0, 'Quantity is 0');
         bool isRegistered = registryAddress.isRegistered(acceptedPayment);
         if (!isRegistered && acceptedPayment != address(0)) {
-            revert("not registerd token");
+            revert("not registered token");
         }
 
         if (isERC1155(nftAddress)) {
             if (IERC1155(nftAddress).balanceOf(_msgSender(), tokenId) < quantity) {
                 revert("insufficient balance");
             }
-        } else {
+        } else if(isERC721(nftAddress)) {
             if (IERC721(nftAddress).ownerOf(tokenId) == _msgSender()) {
                 revert("not owner of token");
             }
             require(quantity == 1, "quantity should be 1");
+        }else {
+            (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(nftAddress);
+            if (ICollectionWrapper(_wrapper).ownerOf(tokenId,_msgSender()) == _msgSender()) {
+                revert("not owner of token");
+            }
+            
         }
 
         _transferNFT(nftAddress, _msgSender(), address(this), tokenId, quantity);
