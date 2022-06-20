@@ -43,6 +43,10 @@ module.exports = {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_KEY}`,
       accounts: [process.env.PRIVATE_KEY]
     },
+    rinkeby: {
+      url: `https://rinkeby.infura.io/v3/${process.env.INFURA_KEY}`,
+      accounts: [process.env.PRIVATE_KEY]
+    },
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 1337
