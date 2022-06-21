@@ -1,4 +1,4 @@
-// SDPX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -474,7 +474,7 @@ contract Marketplace is
         return "2.2.1";
     }
 
-    function increment() public {
-        counter++;
+    function updateTokenRegistry(address _newAddress) public onlyOwner {
+        registryAddress = IERC20Registry(_newAddress);
     }
 }
