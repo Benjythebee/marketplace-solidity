@@ -236,9 +236,9 @@ contract Marketplace is
         returns (bool)
     {
         if (isERC1155(_nftAddress)) {
-            return IERC1155(_nftAddress).isApprovedForAll(_from, _msgSender());
+            return IERC1155(_nftAddress).isApprovedForAll(_from, address(this));
         } else {
-            return IERC721(_nftAddress).isApprovedForAll(_from, _msgSender());
+            return IERC721(_nftAddress).isApprovedForAll(_from, address(this));
         }
     }
 
@@ -335,6 +335,7 @@ contract Marketplace is
     }
 
     function buyWithToken(bytes32 id, uint256 quantity) public whenNotPaused {
+        require(isExistId(id), "Id does not exist");
         require(isListingValid(id), "Listing is invalid");
         require(quantity > 0, "Quantity is 0");
 
@@ -379,6 +380,7 @@ contract Marketplace is
     }
 
     function buy(bytes32 id, uint256 quantity) public payable whenNotPaused {
+        require(isExistId(id), "Id does not exist");
         require(isListingValid(id), "Listing is invalid");
         Listing memory l = listings[id];
         require(l.acceptedPayment == address(0), "should pay ether");
@@ -407,7 +409,7 @@ contract Marketplace is
     }
 
     function cancelList(bytes32 id) public {
-        require(isExistId(id), "not existing id");
+        require(isExistId(id), "Id does not exist");
         Listing memory l = listings[id];
         require(l.seller == _msgSender(), "not listing owner");
         require(l.quantity > 0, "no quantity");
