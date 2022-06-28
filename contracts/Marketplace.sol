@@ -244,10 +244,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         view
         returns (bool)
     {
-        if (isERC1155(_nftAddress)) {
+        if (isERC1155(_nftAddress) || isERC721(_nftAddress)) {
             return IERC1155(_nftAddress).isApprovedForAll(_from, address(this));
         } else {
-            return IERC721(_nftAddress).isApprovedForAll(_from, address(this));
+            (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(_nftAddress);
+            return ICollectionWrapper(_wrapper).isApprovedForAll(_from, address(this));
         }
     }
 
@@ -258,11 +259,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         uint256 _quantity
     ) private view returns (bool) {
         if (isERC1155(_nftAddress)) {
-            return
-                IERC1155(_nftAddress).balanceOf(_from, _tokenId) >= _quantity;
-        } else {
+            return IERC1155(_nftAddress).balanceOf(_from, _tokenId) >= _quantity;
+        } else if(isERC721(_nftAddress)) {
             return IERC721(_nftAddress).ownerOf(_tokenId) == _from;
+        } else {
+            (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(_nftAddress);
+            return ICollectionWrapper(_wrapper).balanceOf(_from, _tokenId) >= _quantity;
         }
+        
     }
 
     function _transferNFT(

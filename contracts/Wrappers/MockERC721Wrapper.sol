@@ -35,6 +35,20 @@ contract MockERC721Wrapper is IERC165, ICollectionWrapper{
 
     /**
     * This function should be public and should be overriden.
+    * It should have an address 'from' and an address 'operator' as input and should contain a set of instruction on setting approval
+    * @dev This should be overriden and replaced with a set of instructions on obtaining isApprovedForAll.
+    * @ see https://eips.ethereum.org/EIPS/eip-721 - isApprovedForAll
+    * @param _from The address of owner of the tokens who has given full approvals before
+    * @param _operator The address of operator that has received the approval from owner before
+    * @return boolean
+    * 
+    */
+    function isApprovedForAll(address _from,address _operator) public view returns (bool){
+        return IERC721(implementation).isApprovedForAll(_from,_operator);
+    }
+
+    /**
+    * This function should be public and should be overriden.
     * It should obtain a uint256 token Id as input and should return an address (or address zero is no owner);
     * @dev This should be overriden and replaced with a set of instructions obtaining the owner of the given tokenId;
     *
