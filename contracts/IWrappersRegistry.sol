@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 interface IWrappersRegistry {
 
 	struct Wrapper {
-		address wrapper;
 		address implementation;
+		address wrapper;
 		string name;
 		bool deleted;
 	}

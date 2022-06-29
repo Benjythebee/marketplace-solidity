@@ -2,6 +2,7 @@
 
 Sometimes smart contracts don't support ERC721 and ERC1155.
 That's where the Wrapper comes in. A wrapper is a smart contract with a set of instructions telling us how to interact with your contract.
+A Wrapper attempts at being a hybrid between ERC721 and ERC1155 to guarantee uni-compatibility
 
 It has interface:
 ```js
@@ -11,6 +12,8 @@ interface ICollectionWrapper{
     function ownerOf(uint256 _tokenId,address _potentialOwner) external view  returns (address);
 
     function transferFrom(address _from, address _to,uint256 _tokenId,uint256 _quantity) external view returns (bool);
+
+    function isApprovedForAll(address _from,address _operator) external view  returns (bool);
 
     function supportsInterface(bytes4 interfaceId) external pure  returns (bool);
 }
@@ -34,6 +37,11 @@ balanceOf(address _user,uint256 _tokenId)... override...{
 ownerOf(uint256 _tokenId,address _potentialOwner)... override...{
     
     return MyContract(_implementation).ownerOf(_tokenId);
+}
+
+isApprovedForAll(address _user,address _operator)... override...{
+    
+    return MyContract(_implementation).isApprovedForAll(_user,_operator);
 }
 ```
 

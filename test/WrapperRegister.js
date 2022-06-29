@@ -14,10 +14,13 @@ describe("WrapperRegister TEST", function () {
   let mockERC721Wrapper;
   let mockERC721;
   let mockERC1155;
-
+  let accessControl;
   let owner, other, author, curreny;
   before(async function() {
     [owner, other, author, curreny] = await ethers.getSigners();
+    let accessControlFactory = await ethers.getContractFactory("CryptovoxelsAccessControl");
+    accessControl= await accessControlFactory.deploy();
+    await accessControl.deployed();
     registeryFactory = await ethers.getContractFactory("WrappersRegistryV1");
     wrapperFactory = await ethers.getContractFactory("MockERC721Wrapper");
     mockERC1155Factory = await ethers.getContractFactory("MockERC1155");
@@ -36,7 +39,7 @@ describe("WrapperRegister TEST", function () {
     mockERC721 = await mockERC721Factory.deploy();
     await mockERC721.deployed();
 
-    registry = await registeryFactory.deploy();
+    registry = await registeryFactory.deploy(accessControl.address);
     await registry.deployed();
 
     mockERC721Wrapper = await wrapperFactory.deploy(mockERC721.address);
@@ -47,9 +50,62 @@ describe("WrapperRegister TEST", function () {
 
   })
 
-  it("Wrapper is not registered", async function () {
-    let a = await registry.isRegistered(mockERC721Wrapper.address)
-...
+  it("AddressZero is set as index 0", async function () {
+    let a = await registry.wrappersSize()
+    let w = await registry.getWrapper(0)
+    expect(a).to.be.equal(1)
+    expect(w.implementation).to.be.equal(ethers.constants.AddressZero)
+    expect(w.wrapper).to.be.equal(ethers.constants.AddressZero)
+    expect(w.name_).to.be.equal('')
   });
 
+  it("Wrapper is not registered", async function () {
+    let a = await registry.isRegistered(mockERC721Wrapper.address)
+    expect(a).to.be.false
+  });
+
+  it("Wrapper is registered", async function () {
+    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    let a = await registry.isRegistered(mockERC721Wrapper.address)
+    expect(a).to.be.true
+    let len = await registry.wrappersSize()
+    expect(len).to.be.equal(2)
+  });
+
+  it("Wrapper is registered -from...", async function () {
+    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+
+    let [id,impl,wrapper,name] = await registry.fromImplementationAddress(mockERC721.address)
+    let [id2,impl2,wrapper2,name2] = await registry.fromName('ERC721')
+  
+    expect(wrapper).to.be.equal(mockERC721Wrapper.address)
+    expect(impl).to.be.equal(mockERC721.address)
+    expect(wrapper2).to.be.equal(mockERC721Wrapper.address)
+  });
+
+  it("Wrapper is unregistered", async function () {
+    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    let a = await registry.isRegistered(mockERC721Wrapper.address)
+    expect(a).to.be.true
+    let [id,impl,wrapper,name] = await registry.fromName('ERC721')
+    await registry.unregister(id)
+    a = await registry.isRegistered(mockERC721Wrapper.address)
+    expect(a).to.be.false
+  });
+
+  it("Wrapper is unregistered - register again", async function () {
+    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    let a = await registry.isRegistered(mockERC721Wrapper.address)
+    let [id,impl,wrapper,name] = await registry.fromName('ERC721')
+    await registry.unregister(id)
+    a = await registry.isRegistered(mockERC721Wrapper.address)
+    expect(a).to.be.false
+
+
+    // test if we can reregister same name - implementation
+    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    let [id2,impl2,wrapper2,name2] = await registry.fromName('ERC721')
+    expect(wrapper2).to.be.equal(mockERC721Wrapper.address)
+    expect(impl2).to.be.equal(mockERC721.address)
+  });
 });

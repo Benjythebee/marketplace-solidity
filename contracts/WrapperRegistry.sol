@@ -16,8 +16,8 @@ contract WrappersRegistryV1 is Pausable {
     address internal _accessControl;
 
 	struct Wrapper {
-		address wrapper;
 		address implementation;
+		address wrapper;
 		string name;
 		bool deleted;
 	}
@@ -28,12 +28,16 @@ contract WrappersRegistryV1 is Pausable {
 	mapping (address => uint) WrapperToId;
 	mapping (string => uint) WrapperNameToId;
 	mapping (address => uint) ImplementationToId;
+	mapping (address => bool) registeredImplementationLookup;
 
 	Wrapper[] wrappers;
-	uint public wrapperCount = 0;
 
     function name() public view virtual returns (string memory) {
         return _name;
+    }
+
+	function wrappersSize() public view virtual returns (uint) {
+        return wrappers.length;
     }
 
 	modifier whenAddressFree(address _addr) {
@@ -61,6 +65,17 @@ contract WrappersRegistryV1 is Pausable {
 	constructor (address _accessControlImpl){
 		_name = "Voxels Marketplace wrappers registy v1";
 		_accessControl = _accessControlImpl;
+
+		//@dev we add address 0 as the first wrapper, so we know index 0 is non-valid
+		WrapperToId[address(0)]=0;
+		WrapperNameToId['']=0;
+		ImplementationToId[address(0)]=0;
+		wrappers.push(Wrapper(
+			address(0),
+            address(0),
+			'',
+            false
+		));
 	}
 
 	function register(
@@ -94,8 +109,8 @@ contract WrappersRegistryV1 is Pausable {
 		delete WrapperToId[wrappers[_id].wrapper];
 		delete WrapperNameToId[wrappers[_id].name];
 		delete ImplementationToId[wrappers[_id].implementation];
+		delete registeredImplementationLookup[wrappers[_id].implementation];
 		wrappers[_id].deleted = true;
-		wrapperCount = wrapperCount - 1;
 
         emit Unregistered(_id, wrappers[_id].name);
 	}
@@ -119,7 +134,7 @@ contract WrappersRegistryV1 is Pausable {
 	function fromAddress(address _addr)
 		external
 		view
-		whenWrapper(WrapperToId[_addr] - 1)
+		whenWrapper(WrapperToId[_addr])
 		returns (
 			uint id_,
 			address implementation_,
@@ -127,7 +142,7 @@ contract WrappersRegistryV1 is Pausable {
 			string memory name_
 		)
 	{
-		id_ = WrapperToId[_addr] - 1;
+		id_ = WrapperToId[_addr];
 		Wrapper storage t = wrappers[id_];
 		implementation_ = t.implementation;
 		wrapper_ = t.wrapper;
@@ -137,7 +152,7 @@ contract WrappersRegistryV1 is Pausable {
 	function fromImplementationAddress(address _addr)
 		public
 		view
-		whenWrapper(ImplementationToId[_addr] - 1)
+		whenWrapper(ImplementationToId[_addr])
 		returns (
 			uint id_,
 			address implementation_,
@@ -145,7 +160,7 @@ contract WrappersRegistryV1 is Pausable {
 			string memory name_
 		)
 	{
-		id_ = ImplementationToId[_addr] - 1;
+		id_ = ImplementationToId[_addr];
 		Wrapper storage t = wrappers[id_];
 		implementation_ = t.implementation;
 		wrapper_ = t.wrapper;
@@ -155,7 +170,7 @@ contract WrappersRegistryV1 is Pausable {
 	function fromName(string memory name__)
 		external
 		view
-		whenWrapper(WrapperNameToId[name__] - 1)
+		whenWrapper(WrapperNameToId[name__])
 		returns (
 			uint id_,
 			address implementation_,
@@ -163,7 +178,7 @@ contract WrappersRegistryV1 is Pausable {
 			string memory name_
 		)
 	{
-		id_ = WrapperNameToId[name__] - 1;
+		id_ = WrapperNameToId[name__];
 		Wrapper storage t = wrappers[id_];
 		implementation_ = t.implementation;
 		wrapper_ = t.wrapper;
@@ -190,9 +205,10 @@ contract WrappersRegistryV1 is Pausable {
             false
 		));
         uint length = wrappers.length;
-		WrapperToId[wrapper_] = length;
-		WrapperNameToId[name_] = length;
-		ImplementationToId[implementation_] = length;
+		WrapperToId[wrapper_] = length -1;
+		WrapperNameToId[name_] = length -1;
+		registeredImplementationLookup[implementation_] =true;
+		ImplementationToId[implementation_] = length -1;
 
 		emit Registered(
             wrappers.length - 1,
@@ -200,20 +216,18 @@ contract WrappersRegistryV1 is Pausable {
 			wrapper_,
 			name_
 		);
-
-		wrapperCount = wrapperCount + 1;
 		return true;
 	}
 
     function isRegistered(address _address) public view returns(bool) {
-        if (WrapperToId[_address] == 0) {
-			return false;
-        }
-        return true;
+        return WrapperToId[_address] != 0;
     }
 
-
+	/**
+	 * @param _impl implementation address
+	 * @return _isWrapped bool whether or not the implementation is wrapped
+	 */
 	function isWrapped(address _impl) public view returns (bool _isWrapped){
-		return ImplementationToId[_impl]!=0;
+		return registeredImplementationLookup[_impl];
 	}
 }

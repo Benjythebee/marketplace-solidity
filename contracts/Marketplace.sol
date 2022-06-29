@@ -157,7 +157,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     }
 
     modifier onlyNFT(address _address) {
-        require(isERC1155(_address) || isERC721(_address) || isRegisteredContract(_address));
+        require(isERC1155(_address) || isERC721(_address) || isRegisteredContract(_address),"Unsupported Contract interface");
         _;
     }
 
@@ -307,6 +307,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         if (!isRegistered && acceptedPayment != address(0)) {
             revert("not registered token");
         }
+        require(_hasNFTApproval(nftAddress,_msgSender()),"Contract is not approved");
 
         if (isERC1155(nftAddress)) {
             if (
@@ -321,7 +322,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             require(quantity == 1, "quantity should be 1");
         }else {
             (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(nftAddress);
-            if (ICollectionWrapper(_wrapper).ownerOf(tokenId,_msgSender()) == _msgSender()) {
+            if (ICollectionWrapper(_wrapper).balanceOf(_msgSender(), tokenId) < quantity) {
                 revert("not owner of token");
             }
             

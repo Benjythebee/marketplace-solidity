@@ -20,7 +20,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 module.exports = {
   solidity: {
-    version: "0.8.4",
+    version: "0.8.12",
     settings: {
       optimizer: {
         enabled: true,
@@ -29,31 +29,31 @@ module.exports = {
     }
   },
   networks: {
-    matic: {
-      url: "https://rpc-mainnet.maticvigil.com",
-      accounts: [process.env.PRIVATE_KEY]
-    },
-    mumbai: {
-      url: "https://rpc-mumbai.maticvigil.com",
-      // url: "https://matic-mumbai.chainstacklabs.com",
-      // url: "https://rpc-mumbai.matic.today",
-      accounts: [process.env.PRIVATE_KEY]
-    },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.INFURA_KEY}`,
-      accounts: [process.env.PRIVATE_KEY]
-    },
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${process.env.INFURA_KEY}`,
-      accounts: [process.env.PRIVATE_KEY]
-    },
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      chainId: 1337
-    },
-    development: {
-      url: "http://127.0.0.1:50770",
-    },
+    // matic: {
+    //   url: "https://rpc-mainnet.maticvigil.com",
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // mumbai: {
+    //   url: "https://rpc-mumbai.maticvigil.com",
+    //   // url: "https://matic-mumbai.chainstacklabs.com",
+    //   // url: "https://rpc-mumbai.matic.today",
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // ropsten: {
+    //   url: `https://ropsten.infura.io/v3/${process.env.INFURA_KEY}`,
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // rinkeby: {
+    //   url: `https://rinkeby.infura.io/v3/${process.env.INFURA_KEY}`,
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // localhost: {
+    //   url: "http://127.0.0.1:8545",
+    //   chainId: 1337
+    // },
+    // development: {
+    //   url: "http://127.0.0.1:50770",
+    // },
   },
   mocha: {
     timeout: 100000
