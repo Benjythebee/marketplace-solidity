@@ -206,7 +206,7 @@ describe("Marketplace TEST", function () {
     let a = await wrapperRegistry.isRegistered(mockNonERC721Wrapper.address)
     expect(a).to.be.true
 
-    await mockNonERC721.setApprovalForAll(marketplace.address, true)
+    await mockNonERC721.setApprovalForAll(mockNonERC721Wrapper.address, true)
 
     const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockNonERC721.address, 1, parseEther("1")]);
     await expect(marketplace.list(mockNonERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.not.be.reverted;
@@ -220,7 +220,7 @@ describe("Marketplace TEST", function () {
 
   it("Should buy non-std contract", async function () {
     const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockNonERC721.address, 1, parseEther("1")]);
-    await mockNonERC721.setApprovalForAll(marketplace.address, true)
+    await mockNonERC721.setApprovalForAll(mockNonERC721Wrapper.address, true)
     await expect(marketplace.list(mockNonERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.not.be.reverted;
  
     await expect(marketplace.connect(other).buy(id1, 1, {value: parseEther("0.9")})).to.be.reverted;

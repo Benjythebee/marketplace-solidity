@@ -248,7 +248,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             return IERC1155(_nftAddress).isApprovedForAll(_from, address(this));
         } else {
             (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(_nftAddress);
-            return ICollectionWrapper(_wrapper).isApprovedForAll(_from, address(this));
+            //@dev Test if the wrapper is approved, not the marketplace.
+            //@dev this isn't great as it might be confusing for the user.
+            return ICollectionWrapper(_wrapper).isApprovedForAll(_from, _wrapper);
         }
     }
 
