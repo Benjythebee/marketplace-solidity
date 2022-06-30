@@ -65,7 +65,7 @@ describe("WrapperRegister TEST", function () {
   });
 
   it("Wrapper is registered", async function () {
-    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
     let a = await registry.isRegistered(mockERC721Wrapper.address)
     expect(a).to.be.true
     let len = await registry.wrappersSize()
@@ -73,7 +73,7 @@ describe("WrapperRegister TEST", function () {
   });
 
   it("Wrapper is registered -from...", async function () {
-    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
 
     let [id,impl,wrapper,name] = await registry.fromImplementationAddress(mockERC721.address)
     let [id2,impl2,wrapper2,name2] = await registry.fromName('ERC721')
@@ -84,7 +84,7 @@ describe("WrapperRegister TEST", function () {
   });
 
   it("Wrapper is unregistered", async function () {
-    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
     let a = await registry.isRegistered(mockERC721Wrapper.address)
     expect(a).to.be.true
     let [id,impl,wrapper,name] = await registry.fromName('ERC721')
@@ -94,7 +94,7 @@ describe("WrapperRegister TEST", function () {
   });
 
   it("Wrapper is unregistered - register again", async function () {
-    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
     let a = await registry.isRegistered(mockERC721Wrapper.address)
     let [id,impl,wrapper,name] = await registry.fromName('ERC721')
     await registry.unregister(id)
@@ -103,7 +103,7 @@ describe("WrapperRegister TEST", function () {
 
 
     // test if we can reregister same name - implementation
-    await registry.registerAs(mockERC721.address,mockERC721Wrapper.address,'ERC721')
+    await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
     let [id2,impl2,wrapper2,name2] = await registry.fromName('ERC721')
     expect(wrapper2).to.be.equal(mockERC721Wrapper.address)
     expect(impl2).to.be.equal(mockERC721.address)

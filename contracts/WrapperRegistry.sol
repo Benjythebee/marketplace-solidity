@@ -10,11 +10,18 @@ import "./Wrappers/ICollectionWrapper.sol";
  * Therefore we use wrappers (or proxies) to standardize them and tell us how to interact with those contracts.
  */
 contract WrappersRegistryV1 is Pausable {
-	// Contract name
+	/// Contract name
     string private _name;
 	///@dev Access control address
     address internal _accessControl;
 
+	/**
+	* Wrapper struct
+	* @dev implementation - the contract the wrapper is for
+	* @dev wrapper - the address of the wrapper
+	* @dev name - name of the wrapper
+	* @dev deleted - Know if wrapper is deleted or not.
+	*/
 	struct Wrapper {
 		address implementation;
 		address wrapper;
@@ -32,12 +39,9 @@ contract WrappersRegistryV1 is Pausable {
 
 	Wrapper[] wrappers;
 
+	///@dev name of the contract
     function name() public view virtual returns (string memory) {
         return _name;
-    }
-
-	function wrappersSize() public view virtual returns (uint) {
-        return wrappers.length;
     }
 
 	modifier whenAddressFree(address _addr) {
@@ -66,7 +70,7 @@ contract WrappersRegistryV1 is Pausable {
 		_name = "Voxels Marketplace wrappers registy v1";
 		_accessControl = _accessControlImpl;
 
-		//@dev we add address 0 as the first wrapper, so we know index 0 is non-valid
+		//@dev we add address 0 as the first wrapper, so we know index 0 is invalid
 		WrapperToId[address(0)]=0;
 		WrapperNameToId['']=0;
 		ImplementationToId[address(0)]=0;
@@ -78,21 +82,6 @@ contract WrappersRegistryV1 is Pausable {
 		));
 	}
 
-	function register(
-		address implementation_,
-		address wrapper_,
-		string memory name_
-	)
-		external
-		returns (bool)
-	{
-		return registerAs(
-			implementation_,
-   			wrapper_,
-			name_
-		);
-	}
-
     function togglePause() public onlyMember(msg.sender){
         if(this.paused()){
             _unpause();
@@ -100,7 +89,10 @@ contract WrappersRegistryV1 is Pausable {
             _pause();
         }
     }
-
+	/**
+	 * @notice remove a wrapper, its name and implementation from the registry
+	 * @param _id uint, Id of the wrapper.
+	 */
 	function unregister(uint _id)
 		external
 		whenWrapper(_id)
@@ -114,7 +106,10 @@ contract WrappersRegistryV1 is Pausable {
 
         emit Unregistered(_id, wrappers[_id].name);
 	}
-
+	/**
+	 * @notice Get a wrapper given an ID
+	 * @param _id uint, Id of the wrapper.
+	 */
 	function getWrapper(uint _id)
 		external
 		view
@@ -130,7 +125,10 @@ contract WrappersRegistryV1 is Pausable {
 		wrapper = t.wrapper;
 		name_ = t.name;
 	}
-
+	/**
+	 * @notice Get a wrapper from its address
+	 * @param _addr address, address of the wrapper
+	 */
 	function fromAddress(address _addr)
 		external
 		view
@@ -148,7 +146,10 @@ contract WrappersRegistryV1 is Pausable {
 		wrapper_ = t.wrapper;
 		name_ = t.name;
 	}
-
+	/**
+	 * @notice Get a wrapper from the implementation address
+	 * @param _addr address, address of the implementation
+	 */
 	function fromImplementationAddress(address _addr)
 		public
 		view
@@ -166,7 +167,10 @@ contract WrappersRegistryV1 is Pausable {
 		wrapper_ = t.wrapper;
 		name_ = t.name;
 	}
-
+	/**
+	 * @notice Get a wrapper from its name
+	 * @param name__ string, the name of the wrapper
+	 */
 	function fromName(string memory name__)
 		external
 		view
@@ -185,7 +189,13 @@ contract WrappersRegistryV1 is Pausable {
 		name_ = t.name;
 	}
 
-	function registerAs(
+	/**
+	 * @notice register an implementation, its wrapper and the wrapper's name
+	 * @param implementation_ address of the implementation
+	 * @param wrapper_ address of the wrapper contract
+	 * @param name_ string
+	 */
+	function register(
 		address implementation_,
 		address wrapper_,
 		string memory name_
@@ -218,7 +228,7 @@ contract WrappersRegistryV1 is Pausable {
 		);
 		return true;
 	}
-
+	///@dev check if wrapper address exists
     function isRegistered(address _address) public view returns(bool) {
         return WrapperToId[_address] != 0;
     }
