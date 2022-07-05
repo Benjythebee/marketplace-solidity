@@ -94,8 +94,10 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         uint tokenId,
         uint price,
         uint quantity,
-        bytes32 indexed listingId,
-        address acceptedPayment
+        bytes32 listingId,
+        uint listingIndex,
+        address acceptedPayment,
+        uint listedDate
     );
 
     event SaleWithToken(    
@@ -104,27 +106,35 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         address contractAddress,
         uint tokenId,
         uint price,
-        bytes32 indexed listingId
+        uint quantity,
+        address accesptedPayment,
+        bytes32 indexed listingId,
+        uint listingIndex,
+        uint saledDate       
     );
     event Sale(    
         address indexed seller,
         address indexed buyer,
+        address contractAddress,
         uint tokenId,
         uint price,
-        bytes32 indexed listingId
+        uint quantity,
+        address accesptedPayment,
+        bytes32 indexed listingId,
+        uint listingIndex,
+        uint saledDate
     );
 
-    event CancelSale(    
-        address indexed seller,
-        uint tokenId,
-        uint price,
-        bytes32 indexed listingId
+    event CancelSale(
+        bytes32 indexed listingId,
+        uint listingIndex,
+        uint cancelledDate
     );
     uint256 counter;
     using ERC165CheckerUpgradeable for address;
     using KeySetLib for KeySetLib.Set;
 
-    mapping(bytes32 => Listing) listings;
+    mapping(bytes32 => Listing[]) listings;
     KeySetLib.Set set;
 
     IWrappersRegistry public wrapperRegistry;
@@ -156,6 +166,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         wrapperRegistry = IWrappersRegistry(_wrapperRegistry);
     }
 
+    modifier onlyAvailableListing(bytes32 _listingId, uint256 _listingIndex) {
+        require(listings[_listingId].length !=0
+               && listings[_listingId][_listingIndex].quantity != 0,
+               "listing not avaialble"
+        );
+        _;
+    }
+
     modifier onlyNFT(address _address) {
         require(isERC1155(_address) || isERC721(_address) || isRegisteredContract(_address),"Unsupported Contract interface");
         _;
@@ -183,40 +201,39 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         return set.count();
     }
 
-    function getListingIdAtIndex(uint256 index) public view returns (bytes32) {
-        return set.keyAtIndex(index);
-    }
+    // function getListingIdAtIndex(uint256 index) public view returns (bytes32) {
+    //     return set.keyAtIndex(index);
+    // }
 
-    function getListingAtIndex(uint256 index)
+    function getListingsAtIndex(uint256 index)
         public
         view
-        returns (Listing memory)
+        returns (Listing[] memory)
     {
         return listings[set.keyAtIndex(index)];
     }
 
-    function getListing(bytes32 id) public view returns (Listing memory) {
-        return listings[id];
+    function getListing(bytes32 id, uint256 listingIndex) public view returns (Listing memory) {
+        return listings[id][listingIndex];
     }
 
-    function getListings() public view returns (Listing[] memory) {
-        uint256 len = getListingCount();
-        Listing[] memory _listings = new Listing[](len);
-        for (uint256 i = 0; i < len; i++) {
-            _listings[i] = getListingAtIndex(i);
-        }
-        return _listings;
-    }
+    // function getListings() public view returns (Listing[] memory) {
+    //     uint256 len = getListingCount();
+    //     Listing[] memory _listings = new Listing[](len);
+    //     for (uint256 i = 0; i < len; i++) {
+    //         _listings[i] = getListingAtIndex(i);
+    //     }
+    //     return _listings;
+    // }
 
     function _generateId(
         address _seller,
         address _contractAddress,
-        uint256 _tokenId,
-        uint256 _price
+        uint256 _tokenId
     ) private pure returns (bytes32) {
         return
             keccak256(
-                abi.encodePacked(_seller, _contractAddress, _tokenId, _price)
+                abi.encodePacked(_seller, _contractAddress, _tokenId)
             );
     }
 
@@ -224,11 +241,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         return set.exists(id);
     }
 
-    function isListingValid(bytes32 id) public view returns (bool) {
+    function isListingValid(bytes32 id, uint256 listingIndex) public view returns (bool) {
         if (!isExistId(id)) {
             return false;
         }
-        Listing memory listing = listings[id];
+        Listing memory listing = listings[id][listingIndex];
         return
             _hasNFTApproval(listing.contractAddress, listing.seller) &&
             _hasNFTOwnership(
@@ -322,17 +339,16 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
                 revert("not owner of token");
             }
             require(quantity == 1, "quantity should be 1");
-        }else {
+        } else {
             (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(nftAddress);
             if (ICollectionWrapper(_wrapper).balanceOf(_msgSender(), tokenId) < quantity) {
                 revert("not owner of token");
             }
-            
         }
 
-        bytes32 id = _generateId(_msgSender(), nftAddress, tokenId, price);
+        bytes32 id = _generateId(_msgSender(), nftAddress, tokenId);
 
-        require(!isExistId(id), "Listing already exists");
+        // require(!isExistId(id), "Listing already exists");
 
         Listing memory l;
 
@@ -342,9 +358,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         l.price = price;
         l.quantity = quantity;
         l.acceptedPayment = acceptedPayment;
-        listings[id] = l;
+        listings[id].push(l);
 
         set.insert(id);
+
+        uint listingLength = listings[id].length;
 
         emit NewListing(
             _msgSender(),
@@ -353,18 +371,22 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             price,
             quantity,
             id,
-            acceptedPayment
+            listingLength - 1,
+            acceptedPayment,
+            block.timestamp
         );
 
         return id;
     }
 
-    function buyWithToken(bytes32 id, uint256 quantity) public whenNotPaused {
+    function buyWithToken(bytes32 id, uint256 listingIndex, uint256 quantity) 
+        public whenNotPaused onlyAvailableListing(id, listingIndex) 
+    {
         require(isExistId(id), "Id does not exist");
-        require(isListingValid(id), "Listing is invalid");
+        require(isListingValid(id, listingIndex), "Listing is invalid");
         require(quantity > 0, "Quantity is 0");
 
-        Listing memory l = listings[id];
+        Listing memory l = listings[id][listingIndex];
         require(l.acceptedPayment != address(0), "should pay erc20 token");
 
         address nft = l.contractAddress;
@@ -387,12 +409,12 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             "Could not send NFT"
         );
 
-        listings[id].quantity -= quantity;
+        listings[id][listingIndex].quantity -= quantity;
 
-        if (l.quantity == 0) {
-            set.remove(id);
-            delete listings[id];
-        }
+        // if (l.quantity == 0) {
+        //     set.remove(id);
+        //     delete listings[id][listingIndex];
+        // }
 
         emit SaleWithToken(
             l.seller,
@@ -400,14 +422,20 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             l.contractAddress,
             l.tokenId,
             l.price,
-            id
+            quantity,
+            l.acceptedPayment,
+            id,
+            listingIndex,
+            block.timestamp
         );
     }
 
-    function buy(bytes32 id, uint256 quantity) public payable whenNotPaused {
+    function buy(bytes32 id, uint256 listingIndex, uint256 quantity) 
+        public payable whenNotPaused onlyAvailableListing (id, listingIndex) 
+    {
         require(isExistId(id), "Id does not exist");
-        require(isListingValid(id), "Listing is invalid");
-        Listing memory l = listings[id];
+        require(isListingValid(id, listingIndex), "Listing is invalid");
+        Listing memory l = listings[id][listingIndex];
         require(l.acceptedPayment == address(0), "should pay ether");
         address nft = l.contractAddress;
 
@@ -423,26 +451,37 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             "Could not transfer NFT"
         );
 
-        listings[id].quantity -= quantity;
+        listings[id][listingIndex].quantity -= quantity;
 
-        if (l.quantity == 0) {
-            set.remove(id);
-            delete listings[id];
-        }
+        // if (l.quantity == 0) {
+        //     set.remove(id);
+        //     delete listings[id];
+        // }
 
-        emit Sale(l.seller, _msgSender(), l.tokenId, l.price, id);
+        emit Sale(
+            l.seller,
+            _msgSender(),
+            l.contractAddress,
+            l.tokenId,
+            l.price,
+            quantity,
+            l.acceptedPayment,
+            id,
+            listingIndex,
+            block.timestamp
+        );
     }
 
-    function cancelList(bytes32 id) public {
+    function cancelList(bytes32 id, uint256 listingIndex) public onlyAvailableListing(id, listingIndex) {
         require(isExistId(id), "Id does not exist");
-        Listing memory l = listings[id];
+        Listing memory l = listings[id][listingIndex];
         require(l.seller == _msgSender(), "not listing owner");
         require(l.quantity > 0, "no quantity");
 
-        set.remove(id);
-        delete listings[id];
+        // set.remove(id);
+        delete listings[id][listingIndex];
 
-        emit CancelSale(_msgSender(), l.tokenId, l.price, id);
+        emit CancelSale(id, listingIndex, block.timestamp);
     }
 
     function setMin(uint256 t) public onlyOwner {
