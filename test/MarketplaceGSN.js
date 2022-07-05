@@ -54,7 +54,14 @@ describe("Marketplace TEST", function () {
 
     await mockERC1155.mint(1, 4);
 
-    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address, forwarderAddress], { kind: "uups"});
+    let accessControlFactory = await ethers.getContractFactory("CryptovoxelsAccessControl");
+    accessControl= await accessControlFactory.deploy();
+    await accessControl.deployed();
+    let wrapperRegisteryFactory = await ethers.getContractFactory("WrappersRegistryV1");
+    wrapperRegistry = await wrapperRegisteryFactory.deploy(accessControl.address);
+    await wrapperRegistry.deployed();
+
+    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address, wrapperRegistry.address, forwarderAddress], { kind: "uups"});
     await marketplace.deployed();
     
     await tokenRegistery.register(mockERC20.address, "mock",18 ,"mock", {value: parseEther("20")});
@@ -115,10 +122,8 @@ describe("Marketplace TEST", function () {
     await gsnContract.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
     const afterBalance = await ethers.provider.getBalance(from);
     expect(initBalance).to.be.equal(afterBalance)
-    expect(await mockERC1155.balanceOf(gsnContract.address, 1)).to.be.equal(3);
-    expect(await mockERC1155.balanceOf(owner.address, 1)).to.be.equal(1);
 
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [from, mockERC1155.address, 1, parseEther("1")]);
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [from, mockERC1155.address, 1]);
 
     expect(await gsnContract.isExistId(id)).to.be.equal(true);
   })
