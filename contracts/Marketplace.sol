@@ -197,7 +197,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         return wrapperRegistry.isWrapped(_address);
     }
 
-    function getListingCount () public view returns (uint) {
+    function getListingCount (bytes32 listingId) public view returns (uint) {
+        return listings[listingId].length;
+    }
+
+    function getIdCount () public view returns (uint) {
         return set.count();
     }
 
@@ -215,6 +219,10 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
     function getListing(bytes32 id, uint256 listingIndex) public view returns (Listing memory) {
         return listings[id][listingIndex];
+    }
+
+    function getListings(bytes32 id) public view returns(Listing[] memory) {
+        return listings[id];
     }
 
     // function getListings() public view returns (Listing[] memory) {
@@ -360,7 +368,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         l.acceptedPayment = acceptedPayment;
         listings[id].push(l);
 
-        set.insert(id);
+        if (!set.exists(id)) {
+            set.insert(id);
+        }
 
         uint listingLength = listings[id].length;
 
@@ -382,7 +392,6 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function buyWithToken(bytes32 id, uint256 listingIndex, uint256 quantity) 
         public whenNotPaused onlyAvailableListing(id, listingIndex) 
     {
-        require(isExistId(id), "Id does not exist");
         require(isListingValid(id, listingIndex), "Listing is invalid");
         require(quantity > 0, "Quantity is 0");
 
@@ -433,7 +442,6 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function buy(bytes32 id, uint256 listingIndex, uint256 quantity) 
         public payable whenNotPaused onlyAvailableListing (id, listingIndex) 
     {
-        require(isExistId(id), "Id does not exist");
         require(isListingValid(id, listingIndex), "Listing is invalid");
         Listing memory l = listings[id][listingIndex];
         require(l.acceptedPayment == address(0), "should pay ether");
