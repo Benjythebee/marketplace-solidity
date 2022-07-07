@@ -51,9 +51,9 @@ describe("WrapperRegister TEST", function () {
   })
 
   it("AddressZero is set as index 0", async function () {
-    let a = await registry.wrappersSize()
+    // let a = await registry.wrappersSize()
     let w = await registry.getWrapper(0)
-    expect(a).to.be.equal(1)
+    // expect(a).to.be.equal(1)
     expect(w.implementation).to.be.equal(ethers.constants.AddressZero)
     expect(w.wrapper).to.be.equal(ethers.constants.AddressZero)
     expect(w.name_).to.be.equal('')
@@ -68,8 +68,8 @@ describe("WrapperRegister TEST", function () {
     await registry.register(mockERC721.address,mockERC721Wrapper.address,'ERC721')
     let a = await registry.isRegistered(mockERC721Wrapper.address)
     expect(a).to.be.true
-    let len = await registry.wrappersSize()
-    expect(len).to.be.equal(2)
+    // let len = await registry.wrappersSize()
+    // expect(len).to.be.equal(2)
   });
 
   it("Wrapper is registered -from...", async function () {

@@ -102,95 +102,101 @@ describe("Marketplace TEST", function () {
    
   it("Should list NFT", async function () {
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
-    expect(await mockERC1155.balanceOf(owner.address, 1)).to.be.equal(4);
 
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
 
     expect(await marketplace.isExistId(id)).to.be.equal(true);
+    const listing = await marketplace.getListing(id, 0);
+
+    expect(listing.seller).to.be.equal(owner.address);
+    expect(listing.contractAddress).to.be.equal(mockERC1155.address);
+    expect(listing.price).to.be.equal(parseEther("1"));
+    expect(listing.quantity).to.be.equal(3);
+    expect(listing.acceptedPayment).to.be.equal(mockERC20.address);
+    expect(listing.tokenId).to.be.equal(1);
    });
 
-  it("Should get list with id", async function () {
-    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
-   
-    const list = await marketplace.getListing(id);
-    expect(list.seller).to.be.equal(owner.address);
-    expect(list.contractAddress).to.be.equal(mockERC1155.address);
-    expect(list.price).to.be.equal(parseEther("1"));
-    expect(list.quantity).to.be.equal(3);
-  });
-
   it("Should buy the NFT with token", async function () {
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
-    await expect(marketplace.connect(other).buyWithToken(id, 1)).to.be.revertedWith("Id does not exist");
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await expect(marketplace.connect(other).buyWithToken(id, 0, 1)).to.be.revertedWith("listing not avaialble");
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
 
     mockAnotherERC20 = await mockERC20Factory.deploy();
     await mockAnotherERC20.deployed();
 
-    await expect(marketplace.connect(other).buyWithToken(id, 1)).to.be.reverted;
+    await expect(marketplace.connect(other).buyWithToken(id, 0, 1)).to.be.reverted;
 
     mockERC20.transfer(other.address, parseEther("4"));
     mockERC20.connect(other).approve(marketplace.address, parseEther("4"));
 
-    await expect(() => marketplace.connect(other).buyWithToken(id, 1)).to.be.changeTokenBalance(mockERC20, owner, parseEther("1"));
+    await expect(() => marketplace.connect(other).buyWithToken(id, 0, 1)).to.be.changeTokenBalance(mockERC20, owner, parseEther("1"));
     expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
     expect(await mockERC1155.balanceOf(owner.address,1)).to.be.equal(3)
 
-    await marketplace.connect(other).buyWithToken(id, 1);
-    await expect(marketplace.connect(other).buyWithToken(id, 2)).to.be.revertedWith("Quantity unavailable");
+    await marketplace.connect(other).buyWithToken(id, 0, 1);
+    await expect(marketplace.connect(other).buyWithToken(id, 0, 2)).to.be.revertedWith("Quantity unavailable");
+  });
+
+  it("Should not buy the NFT with token when already sold", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
+
+    mockERC20.transfer(other.address, parseEther("4"));
+    mockERC20.connect(other).approve(marketplace.address, parseEther("4"));
+
+    await marketplace.connect(other).buyWithToken(id, 0, 3);
+
+    await expect(marketplace.connect(other).buyWithToken(id, 0, 1)).to.be.revertedWith("listing not avaialble");
   });
 
   it("Should buy the NFT with native asset", async function () {
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
-    await expect(marketplace.buy(id, 1, {value: parseEther("1")})).to.be.revertedWith("Id does not exist");
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await expect(marketplace.buy(id, 0, 1, {value: parseEther("1")})).to.be.revertedWith("listing not avaialble");
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
 
-    await expect(marketplace.connect(other).buy(id, 1, {value: parseEther("0.9")})).to.be.reverted;
+    await expect(marketplace.connect(other).buy(id, 0, 1, {value: parseEther("0.9")})).to.be.reverted;
 
-    await expect(() => marketplace.connect(other).buy(id, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
     expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
   });
 
     
   it("Listing validity should behave accordingly", async function () {
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
 
     await mockERC1155.setApprovalForAll(marketplace.address, false)
     // the seller has not approved the contract to allow transfers, revert
-    await expect(marketplace.connect(other).buy(id, 1, {value: parseEther("1")})).to.be.revertedWith("Listing is invalid");
+    await expect(marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.be.revertedWith("Listing is invalid");
 
     // seller sets approval;
     await mockERC1155.setApprovalForAll(marketplace.address,true)
 
-    await expect(() => marketplace.connect(other).buy(id, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
   });
 
 
   it("Should not cancel the list when not owner", async function () {
-    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
-    await expect(marketplace.cancelList(id)).to.be.revertedWith("Id does not exist");
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await expect(marketplace.cancelList(id, 0)).to.be.revertedWith("listing not avaialble");
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
 
-    await expect(marketplace.connect(other).cancelList(id)).to.be.revertedWith("not listing owner");
+    await expect(marketplace.connect(other).cancelList(id, 0)).to.be.revertedWith("not listing owner");
 
-    await marketplace.cancelList(id);
+    await marketplace.cancelList(id, 0);
 
-    await expect(marketplace.connect(other).cancelList(id)).to.be.revertedWith("Id does not exist");
+    await expect(marketplace.connect(other).cancelList(id, 0)).to.be.revertedWith("listing not avaialble");
   });
 
-  it("Should get all listings", async function () {
-    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockERC1155.address, 1, parseEther("1")]);
+  it("Should not cancel the list when already sold", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
 
-    mockERC1155.connect(other).mint(2, 4)
-    mockERC1155.connect(other).setApprovalForAll(marketplace.address, true);
-    const id2 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [other.address, mockERC1155.address, 2, parseEther("1")]);
-    await marketplace.connect(other).list(mockERC1155.address, 2, parseEther("1"), 2, mockERC20.address);
+    mockERC20.transfer(other.address, parseEther("4"));
+    mockERC20.connect(other).approve(marketplace.address, parseEther("4"));
+    await marketplace.connect(other).buyWithToken(id, 0, 3);
 
-    const listings = await marketplace.getListings();
-    expect(listings.length).to.be.equal(2);
+    await expect(marketplace.connect(other).cancelList(id, 0)).to.be.revertedWith("listing not avaialble");
   });
 
   // Test wrapper logic in marketplace
@@ -201,17 +207,16 @@ describe("Marketplace TEST", function () {
   });
 
   it("Should list of wrapped non-std contract", async function () {
-
     await wrapperRegistry.register(mockNonERC721.address,mockNonERC721Wrapper.address,'NonERC721')
     let a = await wrapperRegistry.isRegistered(mockNonERC721Wrapper.address)
     expect(a).to.be.true
 
     await mockNonERC721.setApprovalForAll(mockNonERC721Wrapper.address, true)
 
-    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockNonERC721.address, 1, parseEther("1")]);
+    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockNonERC721.address, 1]);
     await expect(marketplace.list(mockNonERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.not.be.reverted;
  
-    const list = await marketplace.getListing(id1);
+    const list = await marketplace.getListing(id1, 0);
     expect(list.seller).to.be.equal(owner.address);
     expect(list.contractAddress).to.be.equal(mockNonERC721.address);
     expect(list.price).to.be.equal(parseEther("1"));
@@ -219,15 +224,35 @@ describe("Marketplace TEST", function () {
   });
 
   it("Should buy non-std contract", async function () {
-    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [owner.address, mockNonERC721.address, 1, parseEther("1")]);
+    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockNonERC721.address, 1]);
     await mockNonERC721.setApprovalForAll(mockNonERC721Wrapper.address, true)
     await expect(marketplace.list(mockNonERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.not.be.reverted;
  
-    await expect(marketplace.connect(other).buy(id1, 1, {value: parseEther("0.9")})).to.be.reverted;
+    await expect(marketplace.connect(other).buy(id1, 0, 1, {value: parseEther("0.9")})).to.be.reverted;
 
-    await expect(() => marketplace.connect(other).buy(id1, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    await expect(() => marketplace.connect(other).buy(id1, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
     expect(await mockNonERC721.ownerOf(1)).to.be.equal(other.address);
-
   });
+
+  it("Should list NFT several times", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 1, mockERC20.address);
+    await marketplace.list(mockERC1155.address, 1, parseEther("2"), 2, mockERC20.address);
+    await marketplace.list(mockERC1155.address, 1, parseEther("3"), 1, mockERC20.address);
+
+    const listingCount = await marketplace.getListingCount(id);
+    expect(listingCount).to.be.equal(3);
+    const listings = await marketplace.getListings(id);
+
+    expect(listings[0].price).to.be.equal(parseEther("1"));
+    expect(listings[0].quantity).to.be.equal(1);
+
+    expect(listings[1].price).to.be.equal(parseEther("2"));
+    expect(listings[1].quantity).to.be.equal(2);
+
+    expect(listings[2].price).to.be.equal(parseEther("3"));
+    expect(listings[2].quantity).to.be.equal(1);
+   });
 
 });
