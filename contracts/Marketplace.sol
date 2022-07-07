@@ -10,6 +10,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@opengsn/contracts/src/BaseRelayRecipient.sol";
 import "./lib/keyset.sol";
 import "./IWrappersRegistry.sol";
@@ -87,6 +88,10 @@ struct Listing {
     address acceptedPayment;
 }
 
+struct Royalty {
+    address royaltier;
+    uint256 percent;
+}
 contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BaseRelayRecipient {
     event NewListing(    
         address indexed seller,
@@ -142,10 +147,13 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     IERC20Registry internal registryAddress;
     uint256 public minPrice;
     uint256 public maxPrice;
-
+    uint256 public fee;
+    uint256 constant SCALE = 10000;
+    mapping(address => Royalty) royalties;
 
     bytes4 public constant IID_IERC1155 = type(IERC1155Upgradeable).interfaceId;
     bytes4 public constant IID_IERC721 = type(IERC721Upgradeable).interfaceId;
+    bytes4 public constant IID_IERC2981 = type(IERC2981).interfaceId;
 
     /**
      *@dev Initialize contract;
@@ -162,6 +170,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         ///@dev Some wearables are incredibly cheap.
         minPrice = 0.001 ether;
         maxPrice = type(uint).max;
+        fee = 500;
         _setTrustedForwarder(_forwarder);
 
         wrapperRegistry = IWrappersRegistry(_wrapperRegistry);
@@ -589,5 +598,34 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
     function updateTokenRegistry(address _newAddress) public onlyOwner {
         registryAddress = IERC20Registry(_newAddress);
+    }
+
+    function setFee(uint256 _fee) public onlyOwner {
+        fee = _fee;
+    }
+
+    function registerRoyalty(address _nftContract, address _royaltier, uint256 _percent) external onlyOwner {
+        royalties[_nftContract] = Royalty(_royaltier, _percent);
+    }
+
+    function removeRoyalty(address _nftContract) external onlyOwner {
+        delete royalties[_nftContract];
+    }
+
+    function isRoyaltyStandard(address _contract) public view returns(bool) {
+        return _contract.supportsInterface(IID_IERC2981);
+    }
+
+    function getRoyalty(address _contract, uint256 _tokenId, uint256 _price) public view returns(address royaltier, uint256 royaltyAmount) {
+        if (isRoyaltyStandard(_contract)) {
+            (royaltier, royaltyAmount) = IERC2981(_contract).royaltyInfo(_tokenId, _price);
+        } else if (royalties[_contract].royaltier != address(0)) {
+            royaltyAmount = _price * royalties[_contract].percent / SCALE;
+            royaltier = royalties[_contract].royaltier;
+        }
+    }
+
+    function withdraw() external onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
     }
 }
