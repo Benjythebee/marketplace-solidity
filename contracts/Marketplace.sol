@@ -366,7 +366,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
                 revert("insufficient balance");
             }
         } else if(isERC721(nftAddress)) {
-            if (IERC721(nftAddress).ownerOf(tokenId) == _msgSender()) {
+            if (IERC721(nftAddress).ownerOf(tokenId) != _msgSender()) {
                 revert("not owner of token");
             }
             require(quantity == 1, "quantity should be 1");
