@@ -433,12 +433,29 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(l.quantity >= quantity, "Quantity unavailable");
         require(l.seller != _msgSender(), "Buyer cannot be seller");
 
+        uint256 salePrice = l.price * quantity;
         require(
-            token.balanceOf(_msgSender()) >= l.price * quantity,
+            token.balanceOf(_msgSender()) >= salePrice,
             "insufficient balance"
         );
+
+        uint256 feeAmount = salePrice * fee / SCALE;
+        (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, salePrice);
+        if (royaltyAmount > 0) {
+            require(
+                token.transferFrom(_msgSender(), royaltier, royaltyAmount),
+                "Could not send ERC20 token for royalty"
+            );
+        }
+
         require(
-            token.transferFrom(_msgSender(), l.seller, l.price * quantity),
+            token.transferFrom(_msgSender(), address(this), feeAmount),
+            "Could not send ERC20 token for fee"
+        );
+        
+        uint256 amount = salePrice - feeAmount - royaltyAmount;
+        require(
+            token.transferFrom(_msgSender(), l.seller, amount),
             "Could not send ERC20 token"
         );
 
@@ -486,7 +503,16 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(l.seller != _msgSender(), "Buyer cannot be seller");
         require(msg.value == l.price * quantity, "invalid amount");
 
-        (bool success, ) = payable(l.seller).call{value: msg.value}("");
+        uint256 feeAmount = msg.value * fee / SCALE;
+        (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, msg.value);
+        bool success;
+        if (royaltyAmount > 0) {
+            (success, ) = payable(royaltier).call{value: royaltyAmount}("");
+            require(success, "Failed to pay royalty");
+        }
+
+        uint256 amount = msg.value - feeAmount - royaltyAmount;
+        (success, ) = payable(l.seller).call{value: amount}("");
         require(success, "Failed to transfer native token");
 
         require(
@@ -626,6 +652,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     }
 
     function withdraw() external onlyOwner {
-        payable(msg.sender).transfer(address(this).balance);
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Failed to withdraw");
     }
 }
