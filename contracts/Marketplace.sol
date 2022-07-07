@@ -438,8 +438,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             token.balanceOf(_msgSender()) >= salePrice,
             "insufficient balance"
         );
-
-        uint256 feeAmount = salePrice * fee / SCALE;
+        
+        // transfer royalty 
         (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, salePrice);
         if (royaltyAmount > 0) {
             require(
@@ -447,12 +447,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
                 "Could not send ERC20 token for royalty"
             );
         }
-
+        // transfer marketing fee
+        uint256 feeAmount = salePrice * fee / SCALE;
         require(
             token.transferFrom(_msgSender(), address(this), feeAmount),
             "Could not send ERC20 token for fee"
         );
         
+        // transfer token to seller
         uint256 amount = salePrice - feeAmount - royaltyAmount;
         require(
             token.transferFrom(_msgSender(), l.seller, amount),
@@ -503,7 +505,10 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(l.seller != _msgSender(), "Buyer cannot be seller");
         require(msg.value == l.price * quantity, "invalid amount");
 
+        // marketing fee
         uint256 feeAmount = msg.value * fee / SCALE;
+
+        // pay royalty
         (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, msg.value);
         bool success;
         if (royaltyAmount > 0) {
@@ -511,6 +516,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             require(success, "Failed to pay royalty");
         }
 
+        // pay for seller
         uint256 amount = msg.value - feeAmount - royaltyAmount;
         (success, ) = payable(l.seller).call{value: amount}("");
         require(success, "Failed to transfer native token");
