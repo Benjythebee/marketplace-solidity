@@ -253,7 +253,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         }
         Listing memory listing = listings[id][listingIndex];
         return
-            _hasNFTApproval(listing.contractAddress, listing.seller) &&
+            hasNFTApproval(listing.contractAddress, listing.seller) &&
             _hasNFTOwnership(
                 listing.contractAddress,
                 listing.seller,
@@ -262,8 +262,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             );
     }
 
-    function _hasNFTApproval(address _nftAddress, address _from)
-        internal
+    function hasNFTApproval(address _nftAddress, address _from)
+        public
         view
         returns (bool)
     {
@@ -348,7 +348,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         if (!isRegistered && acceptedPayment != address(0)) {
             revert("not registered token");
         }
-        require(_hasNFTApproval(nftAddress,_msgSender()),"Contract is not approved");
+        require(hasNFTApproval(nftAddress,_msgSender()),"Contract is not approved");
 
         if (isERC1155(nftAddress)) {
             if (
