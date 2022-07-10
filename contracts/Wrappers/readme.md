@@ -13,8 +13,6 @@ interface ICollectionWrapper{
 
     function transferFrom(address _from, address _to,uint256 _tokenId,uint256 _quantity) external view returns (bool);
 
-    function isApprovedForAll(address _from,address _operator) external view  returns (bool);
-
     function supportsInterface(bytes4 interfaceId) external pure  returns (bool);
 }
 ```
@@ -38,11 +36,7 @@ ownerOf(uint256 _tokenId,address _potentialOwner)... override...{
     
     return MyContract(_implementation).ownerOf(_tokenId);
 }
-
-isApprovedForAll(address _user,address _operator)... override...{
-    
-    return MyContract(_implementation).isApprovedForAll(_user,_operator);
-}
+...
 ```
 
 Then deploy the CollectionWrapper and set the _implementation = your contract address in the constructor.
@@ -60,10 +54,15 @@ Make sure the Interface is supported.
 ```
 
 ## Make my own.
-A good place to start is to have a look at `DefaultWrapper.sol`, copy paste it and make the appropriate changes.
+A good place to start is to have a look at `DefaultWrapper.sol`, or `MockERC721Wrapper.sol`, copy paste it and make the appropriate changes.
 
 The wrapper should not be Ownable.
 
 Deploy the Wrapper and verify it.
 
-Then make an issue on the Github saying you would like it to be registered onto the CollectionWrapper register.
+Then make an issue on Github saying you would like it to be registered onto the CollectionWrapper register.
+
+**PLEASE NOTE :** Your NFT contract implementation should at least support `isApprovalForAll` and `setApprovalForAll`.
+Or else, making a wrapper for your implementation is useless and you won't be able to add support for your contract on the Voxels marketplace.
+
+Reason: While `isApprovalForAll` is easily implementable, `setApprovalForAll` is not. This is because doing `wrapper.setApprovalForAll()` will ask your implementation contract to set approval for the operator's address (the wrapper) given the `msg.sender` (which is also the wrapper now), and you've guessed it, we can't have msg.sender = operator;

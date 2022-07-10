@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@opengsn/contracts/src/BaseRelayRecipient.sol";
 import "./lib/keyset.sol";
+import "./lib/IApprovalForAll.sol";
 import "./IWrappersRegistry.sol";
 import "./Wrappers/ICollectionWrapper.sol";
 
@@ -273,7 +274,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             (,,address _wrapper,)=wrapperRegistry.fromImplementationAddress(_nftAddress);
             //@dev Test if the wrapper is approved, not the marketplace.
             //@dev this isn't great as it might be confusing for the user.
-            return ICollectionWrapper(_wrapper).isApprovedForAll(_from, _wrapper);
+            return IApprovalForAll(_nftAddress).isApprovedForAll(_from, _wrapper);
         }
     }
 

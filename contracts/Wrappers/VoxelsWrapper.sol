@@ -51,19 +51,6 @@ contract CollectionWrapper is IERC165, ICollectionWrapper{
 
     /**
     * This function should be public and should be overriden.
-    * It should have an address 'from' and an address 'operator' as input and should contain a set of instruction on setting approval
-    * @dev This should be overriden and replaced with a set of instructions on obtaining isApprovedForAll.
-    * @ see https://eips.ethereum.org/EIPS/eip-721 - isApprovedForAll
-    * @param _from The address of owner of the tokens who has given full approvals before
-    * @param _operator The address of operator that has received the approval from owner before
-    * @return boolean
-    * 
-    */
-    function isApprovedForAll(address _from,address _operator) public view returns (bool){
-        return ParcelContract(implementation).isApprovedForAll(_from,_operator);
-    }
-    /**
-    * This function should be public and should be overriden.
     * It should obtain basic inputs to allow transfer of an NFT to another address.
     * @dev This should be overriden and replaced with a set of instructions telling your contract to transfer NFTs.
     *
