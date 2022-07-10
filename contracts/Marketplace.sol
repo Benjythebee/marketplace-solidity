@@ -106,28 +106,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     );
 
     event SaleWithToken(    
-        address indexed seller,
-        address indexed buyer,
-        address contractAddress,
-        uint tokenId,
-        uint price,
-        uint quantity,
-        address accesptedPayment,
         bytes32 indexed listingId,
         uint listingIndex,
-        uint saledDate       
+        uint quantity
     );
     event Sale(    
-        address indexed seller,
-        address indexed buyer,
-        address contractAddress,
-        uint tokenId,
-        uint price,
-        uint quantity,
-        address accesptedPayment,
         bytes32 indexed listingId,
         uint listingIndex,
-        uint saledDate
+        uint quantity
     );
 
     event CancelSale(
@@ -474,16 +460,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         // }
 
         emit SaleWithToken(
-            l.seller,
-            _msgSender(),
-            l.contractAddress,
-            l.tokenId,
-            l.price,
-            quantity,
-            l.acceptedPayment,
             id,
             listingIndex,
-            block.timestamp
+            quantity
         );
     }
 
@@ -534,16 +513,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         // }
 
         emit Sale(
-            l.seller,
-            _msgSender(),
-            l.contractAddress,
-            l.tokenId,
-            l.price,
-            quantity,
-            l.acceptedPayment,
             id,
             listingIndex,
-            block.timestamp
+            quantity
         );
     }
 
