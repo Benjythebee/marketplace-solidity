@@ -136,7 +136,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     IERC20Registry internal registryAddress;
     uint256 public minPrice;
     uint256 public maxPrice;
-    uint256 public fee;
+    uint256 public fee; // 1% = 100, 100% = 1000
     uint256 constant SCALE = 10000;
     mapping(address => Royalty) royalties;
 
