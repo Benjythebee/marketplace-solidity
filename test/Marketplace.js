@@ -20,6 +20,8 @@ describe("Marketplace TEST", function () {
   let wrapperRegistry; // wrapper registry to allow non-ERC721 non-ERC1155
   let mockNonERC721;// an ERC721-like contract but isn't ERC721
   let mockNonERC721Wrapper;// wrapper around the ERC721 std; (for easy testing)
+  let voxelsWrapper; //wrapper around the voxels contract
+  let oldParcelContract;
   let accessControl;
   let mockERC20;
   let owner, other, author, curreny;
@@ -34,6 +36,13 @@ describe("Marketplace TEST", function () {
     let mockNonERC721Factory = await ethers.getContractFactory("MockNonERC721");
     mockNonERC721 = await mockNonERC721Factory.deploy();
     await mockNonERC721.deployed();
+    let OldParcelFactory = await ethers.getContractFactory("OldParcel");
+    oldParcelContract = await OldParcelFactory.deploy();
+    await oldParcelContract.deployed();
+    await oldParcelContract.mint(owner.address,1,0,0,0,1,1,1,0) // mint a parcel to test another non-erc721 contract
+    let voxelsWrapperFactory = await ethers.getContractFactory("VoxelsWrapper");
+    voxelsWrapper = await voxelsWrapperFactory.deploy(oldParcelContract.address);
+    await voxelsWrapper.deployed();
     let wrapperFactory = await ethers.getContractFactory("MockNonERC721Wrapper");
     mockNonERC721Wrapper = await wrapperFactory.deploy(mockNonERC721.address);
     await mockNonERC721Wrapper.deployed();
@@ -219,6 +228,29 @@ describe("Marketplace TEST", function () {
     const list = await marketplace.getListing(id1, 0);
     expect(list.seller).to.be.equal(owner.address);
     expect(list.contractAddress).to.be.equal(mockNonERC721.address);
+    expect(list.price).to.be.equal(parseEther("1"));
+    expect(list.quantity).to.be.equal(1);
+  });
+
+  it("Should list wrapped voxels contract", async function () {
+    const id1 = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, oldParcelContract.address, 1]);
+    // This proves the contract is non-ERC721, non-ERC1155 and not registered in the registry of wrappers.
+    await expect(marketplace.list(oldParcelContract.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.be.revertedWith("Unsupported Contract interface");
+ 
+    // Create a wrapper around the voxels contract; Add that wrapper to the registry
+    await wrapperRegistry.register(oldParcelContract.address,voxelsWrapper.address,'voxels')
+    let a = await wrapperRegistry.isRegistered(voxelsWrapper.address)
+    expect(a).to.be.true
+
+    // Set approval for the voxels wrapper(not the marketplace) (aka implementation.setApprovalForAll(wrapper) )
+    await oldParcelContract.setApprovalForAll(voxelsWrapper.address, true)
+
+    //Retry listing of parcel contract; should be successful
+    await expect(marketplace.list(oldParcelContract.address, 1, parseEther("1"), 1, ethers.constants.AddressZero)).to.not.be.reverted;
+
+    const list = await marketplace.getListing(id1, 0);
+    expect(list.seller).to.be.equal(owner.address);
+    expect(list.contractAddress).to.be.equal(oldParcelContract.address);
     expect(list.price).to.be.equal(parseEther("1"));
     expect(list.quantity).to.be.equal(1);
   });

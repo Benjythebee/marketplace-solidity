@@ -15,11 +15,13 @@ interface ParcelContract {
  * Cryptovoxels does not support ERC721 or ERC1155
  * This way the wrapper can tell us how to interact with a contract.
  */
-contract CollectionWrapper is IERC165, ICollectionWrapper{
+contract VoxelsWrapper is IERC165, ICollectionWrapper{
 
     ///@dev implementation address to set in the constructor
-    address public implementation = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
-
+    address public implementation;// = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
+    constructor(address _impl){
+        implementation=_impl;
+    }
     /**
     * @dev This function should be public and should be overriden.
     * It should obtain an address and a tokenId as input and should return a uint256 value;
