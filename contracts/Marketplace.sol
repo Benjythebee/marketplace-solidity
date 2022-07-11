@@ -10,6 +10,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@opengsn/contracts/src/BaseRelayRecipient.sol";
 import "./lib/keyset.sol";
 import "./lib/IApprovalForAll.sol";
@@ -88,6 +89,10 @@ struct Listing {
     address acceptedPayment;
 }
 
+struct Royalty {
+    address royaltier;
+    uint256 percent;
+}
 contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BaseRelayRecipient {
     event NewListing(    
         address indexed seller,
@@ -102,28 +107,16 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     );
 
     event SaleWithToken(    
-        address indexed seller,
-        address indexed buyer,
-        address contractAddress,
-        uint tokenId,
-        uint price,
-        uint quantity,
-        address accesptedPayment,
         bytes32 indexed listingId,
         uint listingIndex,
-        uint saledDate       
+        uint quantity,
+        uint saleDate
     );
     event Sale(    
-        address indexed seller,
-        address indexed buyer,
-        address contractAddress,
-        uint tokenId,
-        uint price,
-        uint quantity,
-        address accesptedPayment,
         bytes32 indexed listingId,
         uint listingIndex,
-        uint saledDate
+        uint quantity,
+        uint saleDate
     );
 
     event CancelSale(
@@ -143,10 +136,13 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     IERC20Registry internal registryAddress;
     uint256 public minPrice;
     uint256 public maxPrice;
-
+    uint256 public fee;
+    uint256 constant SCALE = 10000;
+    mapping(address => Royalty) royalties;
 
     bytes4 public constant IID_IERC1155 = type(IERC1155Upgradeable).interfaceId;
     bytes4 public constant IID_IERC721 = type(IERC721Upgradeable).interfaceId;
+    bytes4 public constant IID_IERC2981 = type(IERC2981).interfaceId;
 
     /**
      *@dev Initialize contract;
@@ -163,6 +159,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         ///@dev Some wearables are incredibly cheap.
         minPrice = 0.001 ether;
         maxPrice = type(uint).max;
+        fee = 500;
         _setTrustedForwarder(_forwarder);
 
         wrapperRegistry = IWrappersRegistry(_wrapperRegistry);
@@ -425,12 +422,31 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(l.quantity >= quantity, "Quantity unavailable");
         require(l.seller != _msgSender(), "Buyer cannot be seller");
 
+        uint256 salePrice = l.price * quantity;
         require(
-            token.balanceOf(_msgSender()) >= l.price * quantity,
+            token.balanceOf(_msgSender()) >= salePrice,
             "insufficient balance"
         );
+        
+        // transfer royalty 
+        (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, salePrice);
+        if (royaltyAmount > 0) {
+            require(
+                token.transferFrom(_msgSender(), royaltier, royaltyAmount),
+                "Could not send ERC20 token for royalty"
+            );
+        }
+        // transfer marketing fee
+        uint256 feeAmount = salePrice * fee / SCALE;
         require(
-            token.transferFrom(_msgSender(), l.seller, l.price * quantity),
+            token.transferFrom(_msgSender(), address(this), feeAmount),
+            "Could not send ERC20 token for fee"
+        );
+        
+        // transfer token to seller
+        uint256 amount = salePrice - feeAmount - royaltyAmount;
+        require(
+            token.transferFrom(_msgSender(), l.seller, amount),
             "Could not send ERC20 token"
         );
 
@@ -447,15 +463,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         // }
 
         emit SaleWithToken(
-            l.seller,
-            _msgSender(),
-            l.contractAddress,
-            l.tokenId,
-            l.price,
-            quantity,
-            l.acceptedPayment,
             id,
             listingIndex,
+            quantity,
             block.timestamp
         );
     }
@@ -478,7 +488,20 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         require(l.seller != _msgSender(), "Buyer cannot be seller");
         require(msg.value == l.price * quantity, "invalid amount");
 
-        (bool success, ) = payable(l.seller).call{value: msg.value}("");
+        // marketing fee
+        uint256 feeAmount = msg.value * fee / SCALE;
+
+        // pay royalty
+        (address royaltier, uint256 royaltyAmount) = getRoyalty(nft, l.tokenId, msg.value);
+        bool success;
+        if (royaltyAmount > 0) {
+            (success, ) = payable(royaltier).call{value: royaltyAmount}("");
+            require(success, "Failed to pay royalty");
+        }
+
+        // pay for seller
+        uint256 amount = msg.value - feeAmount - royaltyAmount;
+        (success, ) = payable(l.seller).call{value: amount}("");
         require(success, "Failed to transfer native token");
 
         require(
@@ -494,15 +517,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         // }
 
         emit Sale(
-            l.seller,
-            _msgSender(),
-            l.contractAddress,
-            l.tokenId,
-            l.price,
-            quantity,
-            l.acceptedPayment,
             id,
             listingIndex,
+            quantity,
             block.timestamp
         );
     }
@@ -590,5 +607,35 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
     function updateTokenRegistry(address _newAddress) public onlyOwner {
         registryAddress = IERC20Registry(_newAddress);
+    }
+
+    function setFee(uint256 _fee) public onlyOwner {
+        fee = _fee;
+    }
+
+    function registerRoyalty(address _nftContract, address _royaltier, uint256 _percent) external onlyOwner {
+        royalties[_nftContract] = Royalty(_royaltier, _percent);
+    }
+
+    function removeRoyalty(address _nftContract) external onlyOwner {
+        delete royalties[_nftContract];
+    }
+
+    function isRoyaltyStandard(address _contract) public view returns(bool) {
+        return _contract.supportsInterface(IID_IERC2981);
+    }
+
+    function getRoyalty(address _contract, uint256 _tokenId, uint256 _price) public view returns(address royaltier, uint256 royaltyAmount) {
+        if (isRoyaltyStandard(_contract)) {
+            (royaltier, royaltyAmount) = IERC2981(_contract).royaltyInfo(_tokenId, _price);
+        } else if (royalties[_contract].royaltier != address(0)) {
+            royaltyAmount = _price * royalties[_contract].percent / SCALE;
+            royaltier = royalties[_contract].royaltier;
+        }
+    }
+
+    function withdraw() external onlyOwner {
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Failed to withdraw");
     }
 }

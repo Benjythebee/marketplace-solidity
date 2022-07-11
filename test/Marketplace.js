@@ -138,7 +138,7 @@ describe("Marketplace TEST", function () {
     mockERC20.transfer(other.address, parseEther("4"));
     mockERC20.connect(other).approve(marketplace.address, parseEther("4"));
 
-    await expect(() => marketplace.connect(other).buyWithToken(id, 0, 1)).to.be.changeTokenBalance(mockERC20, owner, parseEther("1"));
+    await marketplace.connect(other).buyWithToken(id, 0, 1);
     expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
     expect(await mockERC1155.balanceOf(owner.address,1)).to.be.equal(3)
 
@@ -165,7 +165,7 @@ describe("Marketplace TEST", function () {
 
     await expect(marketplace.connect(other).buy(id, 0, 1, {value: parseEther("0.9")})).to.be.reverted;
 
-    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    await marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")});
     expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
   });
 
@@ -181,7 +181,9 @@ describe("Marketplace TEST", function () {
     // seller sets approval;
     await mockERC1155.setApprovalForAll(marketplace.address,true)
 
-    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(0)
+    await marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")});
+    expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1)
   });
 
 
@@ -262,7 +264,7 @@ describe("Marketplace TEST", function () {
  
     await expect(marketplace.connect(other).buy(id1, 0, 1, {value: parseEther("0.9")})).to.be.reverted;
 
-    await expect(() => marketplace.connect(other).buy(id1, 0, 1, {value: parseEther("1")})).to.be.changeEtherBalance(owner, parseEther("1"));
+    await marketplace.connect(other).buy(id1, 0, 1, {value: parseEther("1")});
     expect(await mockNonERC721.ownerOf(1)).to.be.equal(other.address);
   });
 
@@ -286,5 +288,35 @@ describe("Marketplace TEST", function () {
     expect(listings[2].price).to.be.equal(parseEther("3"));
     expect(listings[2].quantity).to.be.equal(1);
    });
+
+  it("Should pay the marketing fee", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
+
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(marketplace, parseEther("0.05"));
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(owner, parseEther("0.95"));
+  });
+
+  it("Should pay the royalty fee", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
+
+    // royaliter is author, percent is 10%
+    await marketplace.registerRoyalty(mockERC1155.address, author.address, 1000);
+
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(author, parseEther("0.1"));
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(owner, parseEther("0.85"));
+  });
+  
+  it("Should pay the standard royalty fee", async function () {
+    mockERC721.mint(1);
+    mockERC721.setApprovalForAll(marketplace.address, 1);
+    // set royalty 15%
+    mockERC721.setDefaultRoyalty(author.address, 1500);
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC721.address, 1]);
+    await marketplace.list(mockERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero);
+
+    await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(author, parseEther("0.15"));
+  });
 
 });
