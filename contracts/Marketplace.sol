@@ -108,12 +108,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     event SaleWithToken(    
         bytes32 indexed listingId,
         uint listingIndex,
-        uint quantity
+        uint quantity,
+        uint saleDate
     );
     event Sale(    
         bytes32 indexed listingId,
         uint listingIndex,
-        uint quantity
+        uint quantity,
+        uint saleDate
     );
 
     event CancelSale(
@@ -462,7 +464,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         emit SaleWithToken(
             id,
             listingIndex,
-            quantity
+            quantity,
+            block.timestamp
         );
     }
 
@@ -515,7 +518,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         emit Sale(
             id,
             listingIndex,
-            quantity
+            quantity,
+            block.timestamp
         );
     }
 
