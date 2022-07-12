@@ -379,7 +379,15 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         l.price = price;
         l.quantity = quantity;
         l.acceptedPayment = acceptedPayment;
-        listings[id].push(l);
+
+        if(listings[id].length>0 && listings[id][listings[id].length-1].quantity==0){
+            ///@dev If we have a listing at index (listings[id].length-1) and it has no quantity, use index (listings[id].length-1).
+            ///@dev While this is a very primitive and naive way of reusing space, we'll not very often have multiple listings of the same NFT by the same user.
+            listings[id][listings[id].length-1] = l;
+        }else{
+            ///@dev we did not find a listing at 0 or the listing is valid, add the listing at index i+1
+            listings[id].push(l);
+        }
 
         if (!set.exists(id)) {
             set.insert(id);
