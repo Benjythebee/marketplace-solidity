@@ -108,7 +108,13 @@ describe("Marketplace TEST", function () {
   it("Should not list when not insufficient balance", async function () {
     await expect(marketplace.list(mockERC1155.address, 1, parseEther("1"), 5, mockERC20.address)).to.be.revertedWith("insufficient balance");
    });
-   
+
+   it("Listing does not exist", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+
+    await expect(marketplace.getListing(id, 0)).to.be.revertedWith("Listings of given id does not exist");
+   });
+
   it("Should list NFT", async function () {
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
 

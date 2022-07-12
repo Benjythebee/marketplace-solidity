@@ -218,6 +218,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     }
 
     function getListing(bytes32 id, uint256 listingIndex) public view returns (Listing memory) {
+        require(listings[id].length>0,"Listing of given id does not exist");
         return listings[id][listingIndex];
     }
 
