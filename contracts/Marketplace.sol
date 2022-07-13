@@ -477,12 +477,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      * @param quantities list of quantities
      */
     function buyBatch(bytes32[] memory ids, uint256[] memory listingIndexes,uint256[] memory quantities) public payable whenNotPaused {
-        require(ids.length == listingIndexes.length,"Size of IDs array and indexes does not match");
-        require(ids.length == quantities.length,"Size of quantity does not match ids");
+        uint256 len = ids.length;
+        require(len>0,"Ids length cannot be zero");
+        require(len<=100,"Cannot buy more than 100 items at the same time");
+        require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
+        require(len == quantities.length,"Size of quantity does not match ids");
         ///@dev hard limit to avoid DoS
-        require(ids.length<100,"Cannot buy more than 100 items at the same time");
         
-        for(uint256 i = 0; i<ids.length;i++){
+        for(uint256 i = 0; i<len;i++){
             Listing memory l = getListing(ids[i], listingIndexes[i]);
             if(l.acceptedPayment != address(0)){
                 buyWithToken(ids[i],listingIndexes[i],quantities[i]);
@@ -514,11 +516,13 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      * @param listingIndexes list of indexes
      */
     function cancelBatch(bytes32[] memory ids, uint256[] memory listingIndexes) public {
-        require(ids.length == listingIndexes.length,"Size of IDs array and indexes does not match");
+        uint256 len = ids.length;
+        require(len>0,"Ids length cannot be zero");
+        require(len<100,"Cannot cancel more than 100 items at the same time");
+        require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
         ///@dev hard limit to avoid DoS
-        require(ids.length<100,"Cannot cancel more than 100 items at the same time");
         
-        for(uint256 i = 0; i<ids.length;i++){
+        for(uint256 i = 0; i<len;i++){
             cancelList(ids[i],listingIndexes[i]);
         }
     }
