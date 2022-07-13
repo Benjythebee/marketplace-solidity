@@ -470,7 +470,29 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
             block.timestamp
         );
     }
-
+    /**
+     * @notice buyBatch of NFTs given the ids and indexes
+     * @param ids list of hashes
+     * @param listingIndexes list of indexes
+     * @param quantities list of quantities
+     */
+    function buyBatch(bytes32[] memory ids, uint256[] memory listingIndexes,uint256[] memory quantities) public payable whenNotPaused {
+        uint256 len = ids.length;
+        require(len>0,"Ids length cannot be zero");
+        ///@dev hard limit to avoid DoS
+        require(len<=100,"Cannot buy more than 100 items at the same time");
+        require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
+        require(len == quantities.length,"Size of quantity does not match ids");
+        
+        for(uint256 i = 0; i<len;i++){
+            Listing memory l = getListing(ids[i], listingIndexes[i]);
+            if(l.acceptedPayment != address(0)){
+                buyWithToken(ids[i],listingIndexes[i],quantities[i]);
+            }else{
+                buy(ids[i],listingIndexes[i],quantities[i]);
+            }
+        }
+    }
     /**
      * @notice Cancel the listing
      * @dev cancel a listing if it exists.
@@ -488,7 +510,22 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
         emit CancelSale(id, listingIndex, block.timestamp);
     }
-
+    /**
+     * @notice cancel a batch of listings
+     * @param ids list of hashes
+     * @param listingIndexes list of indexes
+     */
+    function cancelBatch(bytes32[] memory ids, uint256[] memory listingIndexes) public {
+        uint256 len = ids.length;
+        require(len>0,"Ids length cannot be zero");
+        ///@dev hard limit to avoid DoS
+        require(len<100,"Cannot cancel more than 100 items at the same time");
+        require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
+        
+        for(uint256 i = 0; i<len;i++){
+            cancelList(ids[i],listingIndexes[i]);
+        }
+    }
     /**
      *@notice Set the minimum listing price
      *@param t is the minium price
