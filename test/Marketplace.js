@@ -281,18 +281,18 @@ describe("Marketplace TEST", function () {
     await marketplace.list(mockERC1155.address, 1, parseEther("2"), 2, mockERC20.address);
     await marketplace.list(mockERC1155.address, 1, parseEther("3"), 1, mockERC20.address);
 
-    const listingCount = await marketplace.getListingCount(id);
-    expect(listingCount).to.be.equal(3);
-    const listings = await marketplace.getListings(id);
-
-    expect(listings[0].price).to.be.equal(parseEther("1"));
-    expect(listings[0].quantity).to.be.equal(1);
-
-    expect(listings[1].price).to.be.equal(parseEther("2"));
-    expect(listings[1].quantity).to.be.equal(2);
-
-    expect(listings[2].price).to.be.equal(parseEther("3"));
-    expect(listings[2].quantity).to.be.equal(1);
+    let listing = await marketplace.getListing(id,0);
+    
+    expect(listing.price).to.be.equal(parseEther("1"));
+    expect(listing.quantity).to.be.equal(1);
+    
+    listing = await marketplace.getListing(id,1);
+    expect(listing.price).to.be.equal(parseEther("2"));
+    expect(listing.quantity).to.be.equal(2);
+    
+    listing = await marketplace.getListing(id,2);
+    expect(listing.price).to.be.equal(parseEther("3"));
+    expect(listing.quantity).to.be.equal(1);
    });
 
   it("Should pay the marketing fee", async function () {
@@ -323,6 +323,54 @@ describe("Marketplace TEST", function () {
     await marketplace.list(mockERC721.address, 1, parseEther("1"), 1, ethers.constants.AddressZero);
 
     await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(author, parseEther("0.15"));
+  });
+
+
+  it("Withdraw Native token", async function () {
+    
+    const getBalance = async ()=>{
+      return parseFloat((await owner.getBalance()).toString())/10**-18
+    }
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
+    const previousBalance = await getBalance()
+
+    await marketplace.connect(other).buy(id, 0, 1,{value:parseEther("1")});
+    const previousBalance2 = await getBalance()
+    expect(previousBalance2).to.be.greaterThan(previousBalance)
+
+    await marketplace.withdraw()
+
+    expect(await getBalance()).to.be.greaterThan(previousBalance2)
+  });
+
+  it("Withdraw ERC20", async function () {
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, mockERC20.address);
+    expect(await mockERC20.balanceOf(marketplace.address)).to.be.equal(0)
+    mockERC20.transfer(other.address, parseEther("4"));
+    mockERC20.connect(other).approve(marketplace.address, parseEther("4"));
+
+    await marketplace.connect(other).buyWithToken(id, 0, 1);
+    expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
+    expect(await mockERC1155.balanceOf(owner.address,1)).to.be.equal(3)
+
+    await marketplace.connect(other).buyWithToken(id, 0, 1);
+
+    const erc20balance = async (address)=>{
+      return parseInt((await mockERC20.balanceOf(address)).toString())/10**-18
+    }
+    
+
+    // check the balance of the ERC20
+    expect(await erc20balance(marketplace.address)).to.be.greaterThan(0)
+    const previousBalance = await erc20balance(owner.address)
+
+    await marketplace.withdrawERC20(mockERC20.address)
+
+    expect(await erc20balance(marketplace.address)).to.be.equal(0)
+    expect(await erc20balance(owner.address)).to.be.greaterThan(previousBalance)
+
   });
 
 });
