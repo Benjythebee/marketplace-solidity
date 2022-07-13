@@ -479,10 +479,10 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function buyBatch(bytes32[] memory ids, uint256[] memory listingIndexes,uint256[] memory quantities) public payable whenNotPaused {
         uint256 len = ids.length;
         require(len>0,"Ids length cannot be zero");
+        ///@dev hard limit to avoid DoS
         require(len<=100,"Cannot buy more than 100 items at the same time");
         require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
         require(len == quantities.length,"Size of quantity does not match ids");
-        ///@dev hard limit to avoid DoS
         
         for(uint256 i = 0; i<len;i++){
             Listing memory l = getListing(ids[i], listingIndexes[i]);
@@ -518,9 +518,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function cancelBatch(bytes32[] memory ids, uint256[] memory listingIndexes) public {
         uint256 len = ids.length;
         require(len>0,"Ids length cannot be zero");
+        ///@dev hard limit to avoid DoS
         require(len<100,"Cannot cancel more than 100 items at the same time");
         require(len == listingIndexes.length,"Size of IDs array and indexes does not match");
-        ///@dev hard limit to avoid DoS
         
         for(uint256 i = 0; i<len;i++){
             cancelList(ids[i],listingIndexes[i]);
