@@ -112,7 +112,7 @@ describe("Marketplace TEST", function () {
    it("Listing does not exist", async function () {
     const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
 
-    await expect(marketplace.getListing(id, 0)).to.be.revertedWith("Listings of given id does not exist");
+    await expect(marketplace.getListing(id, 0)).to.be.revertedWith("Listing of given id does not exist");
    });
 
   it("Should list NFT", async function () {
