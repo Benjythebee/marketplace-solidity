@@ -360,7 +360,6 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
 
     /**
      *@notice Buy the NFT with token, instead of native assets
-     @
      *@param id is the identifier for the NFT
      *@param listingIndex is the index of listing for the id
      *@param quantity is the amount of NFT that is going to buy
@@ -601,7 +600,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     ///@dev withdrawBalance of ERC20;
     function withdrawERC20(address _tokenAddress) external onlyOwner {
         IERC20Upgradeable token = IERC20Upgradeable(_tokenAddress);
-        bool success = token.transferFrom(address(this), _msgSender(), token.balanceOf(address(this)));
+        bool success = token.transfer( _msgSender(), token.balanceOf(address(this)));
         require(success, "Failed to withdraw");
     }
 }
