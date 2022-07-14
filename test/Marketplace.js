@@ -25,8 +25,10 @@ describe("Marketplace TEST", function () {
   let accessControl;
   let mockERC20;
   let owner, other, author, curreny;
+  let provider;
   before(async function() {
     [owner, other, author, curreny] = await ethers.getSigners();
+    provider = owner.provider
     let accessControlFactory = await ethers.getContractFactory("CryptovoxelsAccessControl");
     accessControl= await accessControlFactory.deploy();
     await accessControl.deployed();
@@ -325,23 +327,25 @@ describe("Marketplace TEST", function () {
     await expect(() => marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.changeEtherBalance(author, parseEther("0.15"));
   });
 
-
+  const getBalance = async (signer)=>{
+    return parseFloat((await provider.getBalance(signer.address)).toString())/10**-18
+  }
+  const erc20balance = async (address)=>{
+    return parseInt((await mockERC20.balanceOf(address)).toString())/10**-18
+  }
   it("Withdraw Native token", async function () {
-    
-    const getBalance = async ()=>{
-      return parseFloat((await owner.getBalance()).toString())/10**-18
-    }
+
     const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
     await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
-    const previousBalance = await getBalance()
+    const previousBalance = await getBalance(owner)
 
     await marketplace.connect(other).buy(id, 0, 1,{value:parseEther("1")});
-    const previousBalance2 = await getBalance()
+    const previousBalance2 = await getBalance(owner)
     expect(previousBalance2).to.be.greaterThan(previousBalance)
 
     await marketplace.withdraw()
 
-    expect(await getBalance()).to.be.greaterThan(previousBalance2)
+    expect(await getBalance(owner)).to.be.greaterThan(previousBalance2)
   });
 
   it("Withdraw ERC20", async function () {
@@ -357,11 +361,6 @@ describe("Marketplace TEST", function () {
 
     await marketplace.connect(other).buyWithToken(id, 0, 1);
 
-    const erc20balance = async (address)=>{
-      return parseInt((await mockERC20.balanceOf(address)).toString())/10**-18
-    }
-    
-
     // check the balance of the ERC20
     expect(await erc20balance(marketplace.address)).to.be.greaterThan(0)
     const previousBalance = await erc20balance(owner.address)
@@ -373,4 +372,34 @@ describe("Marketplace TEST", function () {
 
   });
 
+  
+  it("Buying NFT with no fee should behave appropriately", async function () {
+
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.list(mockERC1155.address, 1, parseEther("1"), 3, ethers.constants.AddressZero);
+
+    await marketplace.setFee(0)
+    const previousBalance = await getBalance(marketplace)
+    expect(previousBalance).to.be.equal(0);
+
+    await expect(marketplace.connect(other).buy(id, 0, 1, {value: parseEther("1")})).to.not.be.reverted;
+    expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
+    // Should not have received any fee
+    expect(await getBalance(marketplace)).to.be.equal(previousBalance);
+  });
+
+  it("Buying NFT with minPrice=0 should behave appropriately", async function () {
+
+    const id = ethers.utils.solidityKeccak256(["address", "address", "uint256"], [owner.address, mockERC1155.address, 1]);
+    await marketplace.setMin(0)
+    await marketplace.list(mockERC1155.address, 1, parseEther("0"), 3, ethers.constants.AddressZero);
+    
+    const previousBalance = await getBalance(marketplace)
+    expect(previousBalance).to.be.equal(0);
+
+    await expect(marketplace.connect(other).buy(id, 0, 1, {value: parseEther("0")})).to.not.be.reverted;
+    expect(await mockERC1155.balanceOf(other.address, 1)).to.be.equal(1);
+    // Should not have received any fee
+    expect(await getBalance(marketplace)).to.be.equal(previousBalance);
+  });
 });
