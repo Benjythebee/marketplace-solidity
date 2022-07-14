@@ -7,14 +7,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165CheckerUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@opengsn/contracts/src/BaseRelayRecipient.sol";
 import "./lib/keyset.sol";
 import "./lib/IApprovalForAll.sol";
-import "./IWrappersRegistry.sol";
+import "./WrapperRegistry.sol";
 import "./Wrappers/ICollectionWrapper.sol";
 import "./IERC20Registry.sol";
 /* We may need to modify the ERCRegistery
@@ -38,7 +37,7 @@ struct Royalty {
     address royaltier;
     uint256 percent;
 }
-contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BaseRelayRecipient {
+contract Marketplace is PausableUpgradeable, UUPSUpgradeable, BaseRelayRecipient {
     event NewListing(    
         address indexed seller,
         address indexed contractAddress,
@@ -79,7 +78,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     KeySetLib.Set set;
     ///@dev A wrapper Registry address: A registry of contracts that wraps around non-standard NFT collections
     ///@dev See WrapperRegistry.sol
-    IWrappersRegistry public wrapperRegistry;
+    WrappersRegistryV1 public wrapperRegistry;
     ///@dev A registry for ERC20 tokens, so users can pay with ERC20s
     IERC20Registry internal registryAddress;
     ///@dev the minimumPrice when listing an NFT
@@ -91,6 +90,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     uint256 constant SCALE = 10000;
     ///@dev royalty lookup; NFT collection -> royalty
     mapping(address => Royalty) royalties;
+    ///@dev accessControl contract to manage admins.
+    CryptovoxelsAccessControl public accessControl;
 
     bytes4 public constant IID_IERC1155 = type(IERC1155Upgradeable).interfaceId;
     bytes4 public constant IID_IERC721 = type(IERC721Upgradeable).interfaceId;
@@ -102,9 +103,8 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      *@param _wrapperRegistry is the address of the registry for Wrappers
      *@param _forwarder is the address of the trusted forwarder.
      */
-    function initialize (address _registryAddress,address _wrapperRegistry, address _forwarder) public initializer {
+    function initialize (address _registryAddress,address _wrapperRegistry,address _accessControl, address _forwarder) public initializer {
         __UUPSUpgradeable_init();
-        __Ownable_init();
         __Pausable_init();
 
         registryAddress = IERC20Registry(_registryAddress);
@@ -114,7 +114,9 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         fee = 500;
         _setTrustedForwarder(_forwarder);
 
-        wrapperRegistry = IWrappersRegistry(_wrapperRegistry);
+        accessControl = CryptovoxelsAccessControl(_accessControl);
+
+        wrapperRegistry = WrappersRegistryV1(_wrapperRegistry);
     }
 
     /**
@@ -129,6 +131,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         );
         _;
     }
+    ///@dev Only member modifier
+    modifier onlyMember(address _addr){
+        require(accessControl.isMember(_addr),'Functionality limited to members');
+    _;
+    }
     ///@dev require the address is a supported NFT contract
     modifier onlyNFT(address _address) {
         require(isERC1155(_address) || isERC721(_address) || isRegisteredContract(_address),"Unsupported Contract interface");
@@ -139,7 +146,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation)
         internal
         override
-        onlyOwner
+        onlyMember(_msgSender())
     {}
 
     function isERC721(address _address) internal view returns (bool) {
@@ -534,7 +541,7 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      *@notice Set the minimum listing price
      *@param t is the minium price
      */
-    function setMin(uint256 t) public onlyOwner {
+    function setMin(uint256 t) public onlyMember(_msgSender()) {
         require(t < maxPrice);
         minPrice = t;
     }
@@ -543,16 +550,16 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      *@notice Set the maximum listing price
      *@param t is the maximum price
      */
-    function setMax(uint256 t) public onlyOwner {
+    function setMax(uint256 t) public onlyMember(_msgSender()) {
         require(t > minPrice);
         maxPrice = t;
     }
 
-    function pause() public onlyOwner {
+    function pause() public onlyMember(_msgSender()) {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    function unpause() public onlyMember(_msgSender()) {
         _unpause();
     }
 
@@ -595,11 +602,11 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         return "2.2.1";
     }
     ///@dev Allows to change the address of the erc20 TokenRegistry.
-    function updateTokenRegistry(address _newAddress) public onlyOwner {
+    function updateTokenRegistry(address _newAddress) public onlyMember(_msgSender()) {
         registryAddress = IERC20Registry(_newAddress);
     }
     ///@notice Set the marketplace's fee (in basis points)
-    function setFee(uint256 _fee) public onlyOwner {
+    function setFee(uint256 _fee) public onlyMember(_msgSender()) {
         fee = _fee;
     }
     /**
@@ -608,14 +615,14 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
      * @param _royaltier The address that will receive the fee.
      * @param _percent % in basis points (1% = 100).
      */
-    function registerRoyalty(address _nftContract, address _royaltier, uint256 _percent) external onlyOwner {
+    function registerRoyalty(address _nftContract, address _royaltier, uint256 _percent) external onlyMember(_msgSender()) {
         royalties[_nftContract] = Royalty(_royaltier, _percent);
     }
     /**
      * @notice Remove royalties for a specific collection.
      * @param _nftContract the collection address
      */
-    function removeRoyalty(address _nftContract) external onlyOwner {
+    function removeRoyalty(address _nftContract) external onlyMember(_msgSender()) {
         delete royalties[_nftContract];
     }
 
@@ -634,12 +641,12 @@ contract Marketplace is PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable
         }
     }
     ///@dev drain the balance of this contract.
-    function withdraw() external onlyOwner {
+    function withdraw() external onlyMember(_msgSender()) {
         (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
         require(success, "Failed to withdraw");
     }
     ///@dev withdrawBalance of ERC20;
-    function withdrawERC20(address _tokenAddress) external onlyOwner {
+    function withdrawERC20(address _tokenAddress) external onlyMember(_msgSender()) {
         IERC20Upgradeable token = IERC20Upgradeable(_tokenAddress);
         bool success = token.transfer( _msgSender(), token.balanceOf(address(this)));
         require(success, "Failed to withdraw");
