@@ -75,7 +75,7 @@ describe("Marketplace TEST", function () {
 
     const fakeForwarder = mockERC1155.address
 
-    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address,wrapperRegistry.address, fakeForwarder], { kind: "uups"});
+    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address,wrapperRegistry.address,accessControl.address, fakeForwarder], { kind: "uups"});
     await marketplace.deployed();
     
     await tokenRegistery.register(mockERC20.address, "mock",18 ,"mock", {value: parseEther("20")});

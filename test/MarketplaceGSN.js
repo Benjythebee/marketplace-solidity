@@ -61,7 +61,7 @@ describe("Marketplace TEST", function () {
     wrapperRegistry = await wrapperRegisteryFactory.deploy(accessControl.address);
     await wrapperRegistry.deployed();
 
-    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address, wrapperRegistry.address, forwarderAddress], { kind: "uups"});
+    marketplace = await upgrades.deployProxy(marketplaceFactory, [tokenRegistery.address, wrapperRegistry.address,accessControl.address, forwarderAddress], { kind: "uups"});
     await marketplace.deployed();
     
     await tokenRegistery.register(mockERC20.address, "mock",18 ,"mock", {value: parseEther("20")});
